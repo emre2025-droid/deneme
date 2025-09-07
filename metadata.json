@@ -1,0 +1,5 @@
+{
+  "name": "Aqua MQTT Real-time Dashboard",
+  "description": "A web application to connect to an MQTT broker, receive messages in real-time, and store them locally. It provides a clean interface to monitor topics and view connection status.",
+  "requestFramePermissions": []
+}
