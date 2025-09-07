@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useMqtt } from './hooks/useMqtt';
 import { ConnectionStatus } from './types';
 import Header from './components/Header';
@@ -15,43 +14,62 @@ const MQTT_BROKER_URL = 'wss://a1ad4768bc2847efa4eec689fee6b7bd.s1.eu.hivemq.clo
 const MQTT_USERNAME = 'Aquaa';
 const MQTT_PASSWORD = 'OqpsHE#47oT1.BN0&$yh';
 const LOCAL_STORAGE_KEY = 'mqtt-messages';
+const API_BASE_URL = 'http://localhost:3001'; // Backend API URL
 
 
 const App: React.FC = () => {
   const [topic, setTopic] = useState<string>('sensor/data');
   const [subscribedTopic, setSubscribedTopic] = useState<string>('');
+  const [messages, setMessages] = useState<MqttMessage[]>([]);
 
-  const { connectionStatus, messages, client } = useMqtt({
-    uri: MQTT_BROKER_URL,
-    options: {
-      username: MQTT_USERNAME,
-      password: MQTT_PASSWORD,
-      clean: true,
-      connectTimeout: 4000,
-      reconnectPeriod: 1000,
-    }
-  });
+  // Memoize the options object to prevent re-creating it on every render.
+  // This stabilizes the dependency for the useMqtt hook, preventing connection loops.
+  const mqttOptions = useMemo(() => ({
+    username: MQTT_USERNAME,
+    password: MQTT_PASSWORD,
+    clean: true,
+    connectTimeout: 8000, // Increased timeout for more reliability
+    reconnectPeriod: 1000,
+  }), []);
 
-  // Load messages from local storage on initial render
-  useEffect(() => {
-    try {
-      const storedMessages = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (storedMessages) {
-        // Here we just set the state, but `useMqtt` hook is the source of truth for new messages
-        // This is primarily for viewing historical data if connection is lost.
-        // A more robust solution might merge local and incoming messages.
-        // For simplicity, we let the hook manage its own message state.
-      }
-    } catch (error) {
-      console.error("Failed to load messages from local storage:", error);
-    }
+  // Callback for when a new message is received from MQTT
+  const onMessageReceived = useCallback((message: MqttMessage) => {
+    // Add new message to the top, and keep the list at a max of 50 items
+    setMessages(prevMessages => [message, ...prevMessages.slice(0, 49)]);
   }, []);
 
+  const { connectionStatus, client } = useMqtt({
+    uri: MQTT_BROKER_URL,
+    options: mqttOptions,
+    onMessage: onMessageReceived,
+  });
+
+  // Load historical messages from the backend on initial render
+  useEffect(() => {
+    const fetchHistoricalMessages = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/messages`);
+        if (response.ok) {
+          const historicalMessages: MqttMessage[] = await response.json();
+          setMessages(historicalMessages);
+          console.log(`Successfully loaded ${historicalMessages.length} historical messages from the database.`);
+        } else {
+          console.warn('Backend not available or failed to fetch historical messages. Showing real-time data only.');
+        }
+      } catch (error) {
+        console.warn('Could not connect to backend for historical messages. Is the backend service running?');
+      }
+    };
+
+    fetchHistoricalMessages();
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   // Save messages to local storage whenever they change
   useEffect(() => {
     try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(messages.slice(-50))); // Store last 50 messages
+      if (messages.length > 0) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(messages.slice(0, 50)));
+      }
     } catch (error) {
       console.error("Failed to save messages to local storage:", error);
     }

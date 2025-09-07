@@ -5,6 +5,7 @@ import { MqttMessage, ConnectionStatus } from '../types';
 interface MqttHookOptions {
   uri: string;
   options?: IClientOptions;
+  onMessage?: (message: MqttMessage) => void;
 }
 
 // Note: The global `mqtt` object comes from the script included in index.html
@@ -14,14 +15,15 @@ declare global {
   }
 }
 
-export const useMqtt = ({ uri, options = {} }: MqttHookOptions) => {
+export const useMqtt = ({ uri, options = {}, onMessage }: MqttHookOptions) => {
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.Disconnected);
-  const [messages, setMessages] = useState<MqttMessage[]>([]);
   const clientRef = useRef<MqttClient | null>(null);
 
   useEffect(() => {
     if (clientRef.current) {
-      return;
+      // Clean up previous connection before creating a new one
+      clientRef.current.end();
+      clientRef.current = null;
     }
 
     if (!window.mqtt) {
@@ -56,15 +58,16 @@ export const useMqtt = ({ uri, options = {} }: MqttHookOptions) => {
         client.end();
       });
 
-      // FIX: The `Buffer` type is not available in browser environments by default. Replaced `Buffer` with a structural type that satisfies the call to `payload.toString()`.
       client.on('message', (topic: string, payload: { toString: () => string }) => {
         const newMessage: MqttMessage = {
           topic,
           payload: payload.toString(),
           timestamp: new Date().toISOString(),
         };
-        console.log('New Message:', newMessage);
-        setMessages(prevMessages => [newMessage, ...prevMessages]);
+        // Instead of managing state here, call the provided callback
+        if (onMessage) {
+          onMessage(newMessage);
+        }
       });
 
     } catch (error) {
@@ -79,8 +82,8 @@ export const useMqtt = ({ uri, options = {} }: MqttHookOptions) => {
         clientRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uri]); // Only re-run if URI changes. Options are assumed to be stable.
+    // Re-run effect if uri or callback changes. `options` are assumed to be stable.
+  }, [uri, onMessage, options]);
 
-  return { connectionStatus, messages, client: clientRef.current };
+  return { connectionStatus, client: clientRef.current };
 };

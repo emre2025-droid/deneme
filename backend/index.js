@@ -3,6 +3,8 @@ require('dotenv').config();
 
 const mqtt = require('mqtt');
 const { Pool } = require('pg');
+const express = require('express');
+const cors = require('cors');
 
 /*
  * -----------------------------------------------------------------------------
@@ -23,6 +25,9 @@ const { Pool } = require('pg');
  * PG_DATABASE=your_postgres_database
  * PG_PASSWORD=your_postgres_password
  * PG_PORT=5432
+ *
+ * # API Sunucu Portu (İsteğe bağlı, varsayılan 3001)
+ * PORT=3001
  * -----------------------------------------------------------------------------
  */
 
@@ -34,6 +39,33 @@ const pool = new Pool({
   password: process.env.PG_PASSWORD,
   port: process.env.PG_PORT,
 });
+
+// --- API Sunucusu Kurulumu ---
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+app.use(cors()); // Farklı origin'lerden (ön uç gibi) gelen isteklere izin ver
+app.use(express.json()); // Gelen isteklerdeki JSON gövdelerini ayrıştır
+
+// Son kaydedilen mesajları getiren API endpoint'i
+app.get('/api/messages', async (req, res) => {
+  try {
+    // Son 50 mesajı en yeniden eskiye doğru sıralayarak getir
+    // Ön uçtaki 'timestamp' alanıyla eşleşmesi için 'received_at' sütununu yeniden adlandır
+    const query = `
+      SELECT id, topic, payload, received_at AS timestamp
+      FROM messages
+      ORDER BY received_at DESC
+      LIMIT 50;
+    `;
+    const { rows } = await pool.query(query);
+    res.status(200).json(rows);
+  } catch (error) {
+    console.error('❌ API üzerinden mesajları çekerken hata:', error);
+    res.status(500).json({ error: 'Mesajlar alınamadı.' });
+  }
+});
+
 
 // Veritabanı tablosunu başlatan ve hazır olduğunu doğrulayan fonksiyon
 async function initializeDatabase() {
@@ -72,7 +104,7 @@ function startMqttClient() {
     username: MQTT_USERNAME,
     password: MQTT_PASSWORD,
     clean: true,
-    connectTimeout: 4000,
+    connectTimeout: 8000, // Increased timeout for robustness
     reconnectPeriod: 1000,
   });
 
@@ -119,8 +151,13 @@ function startMqttClient() {
 async function main() {
   console.log('🚀 Backend servisi başlatılıyor...');
   const dbReady = await initializeDatabase();
+
   if (dbReady) {
+    // Veritabanı hazırsa hem MQTT istemcisini hem de API sunucusunu başlat
     startMqttClient();
+    app.listen(PORT, () => {
+      console.log(`✅ API sunucusu http://localhost:${PORT} adresinde çalışıyor.`);
+    });
   } else {
     console.error('❗️ Veritabanı hazır olmadığı için servis başlatılamadı. Lütfen .env ayarlarınızı kontrol edin.');
     process.exit(1);
