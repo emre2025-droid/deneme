@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 const DatabaseInfo: React.FC = () => {
@@ -10,14 +9,23 @@ const DatabaseInfo: React.FC = () => {
         </svg>
         Data Persistence
       </h2>
-      <div className="space-y-3 text-gray-300">
+      <div className="space-y-4 text-gray-300">
         <div className="flex items-start space-x-3">
-          <span className="text-green-400 mt-1">✓</span>
-          <p><strong className="font-semibold text-white">Local Storage:</strong> Messages are temporarily saved in your browser's local storage.</p>
+          <span className="text-green-400 mt-1 font-bold">✓</span>
+          <p><strong className="font-semibold text-white">Local Storage:</strong> Recent messages are temporarily saved in your browser to maintain the feed across page reloads.</p>
         </div>
+        <div className="border-t border-gray-700 my-2"></div>
         <div className="flex items-start space-x-3">
-          <span className="text-blue-400 mt-1">→</span>
-          <p><strong className="font-semibold text-white">PostgreSQL:</strong> To permanently store data in PostgreSQL, a backend service (e.g., a Node.js API) is required. This service would subscribe to the MQTT topic and insert messages into the database.</p>
+           <svg className="h-5 w-5 mr-1 text-blue-400 mt-1 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 11v5" />
+            <path d="M12 17a1 1 0 100-2 1 1 0 000 2z" />
+            <path d="M2.5 12.5a10 10 0 1119 0 10 10 0 01-19 0z" />
+          </svg>
+          <div>
+            <p><strong className="font-semibold text-white">PostgreSQL Backend:</strong> This project includes a Node.js backend service located in the <code className="bg-gray-700 text-cyan-300 px-1 rounded-sm text-sm">/backend</code> directory.</p>
+            <p className="text-sm text-gray-400 mt-2">When running, this service subscribes to the MQTT topic and permanently stores all messages in a PostgreSQL database.</p>
+            <p className="text-sm text-gray-400 mt-1">To use it, you must configure your credentials in a <code className="bg-gray-700 text-cyan-300 px-1 rounded-sm text-sm">.env</code> file and run the service.</p>
+          </div>
         </div>
       </div>
     </div>

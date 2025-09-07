@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import type { MqttClient, IClientOptions } from 'mqtt';
 import { MqttMessage, ConnectionStatus } from '../types';
@@ -57,7 +56,8 @@ export const useMqtt = ({ uri, options = {} }: MqttHookOptions) => {
         client.end();
       });
 
-      client.on('message', (topic: string, payload: Buffer) => {
+      // FIX: The `Buffer` type is not available in browser environments by default. Replaced `Buffer` with a structural type that satisfies the call to `payload.toString()`.
+      client.on('message', (topic: string, payload: { toString: () => string }) => {
         const newMessage: MqttMessage = {
           topic,
           payload: payload.toString(),
